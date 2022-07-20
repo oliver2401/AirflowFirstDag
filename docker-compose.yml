@@ -1,5 +1,4 @@
 version: '3.7'
-
 # ====================================== AIRFLOW ENVIRONMENT VARIABLES =======================================
 x-environment: &airflow_environment
   - AIRFLOW__CORE__EXECUTOR=LocalExecutor
@@ -9,8 +8,7 @@ x-environment: &airflow_environment
   - AIRFLOW__CORE__STORE_DAG_CODE=True
   - AIRFLOW__CORE__STORE_SERIALIZED_DAGS=True
   - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
-
-x-airflow-image: &airflow_image apache/airflow:2.0.0-python3.8
+  - AIRFLOW__WEBSERVER__RBAC=False
 # ====================================== /AIRFLOW ENVIRONMENT VARIABLES ======================================
 services:
   postgres:
@@ -21,17 +19,17 @@ services:
       - POSTGRES_DB=airflow
     ports:
       - "5432:5432"
-
   init:
-    image: *airflow_image
+    build:
+      context: docker/airflow-data
     depends_on:
       - postgres
     environment: *airflow_environment
     entrypoint: /bin/bash
-    command: -c 'airflow db init && airflow users create --username admin --password admin --firstname Anonymous --lastname Admin --role Admin --email admin@example.org'
-
+    command: -c 'airflow db upgrade && sleep 5 && airflow users create --username MLBros --password MLBros --firstname MLBros --lastname MLBros --role Admin --email MLBros@example.org'
   webserver:
-    image: *airflow_image
+    build:
+      context: docker/airflow-data
     restart: always
     depends_on:
       - postgres
@@ -41,17 +39,23 @@ services:
       - logs:/opt/airflow/logs
     environment: *airflow_environment
     command: webserver
-
   scheduler:
-    image: *airflow_image
+    build:
+      context: docker/airflow-data
     restart: always
     depends_on:
       - postgres
     volumes:
-      - logs:/opt/airflow/logs
       - ./dags:/opt/airflow/dags
+      - logs:/opt/airflow/logs
+      - data:/data
     environment: *airflow_environment
     command: scheduler
+  events_api:
+    build: ./docker/events-api
+    ports:
+      - "5000:5000"
 
 volumes:
+  data:
   logs:
